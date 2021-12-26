@@ -1,0 +1,76 @@
+#define BLYNK_PRINT Serial 
+#include <SPI.h>
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+#include "FirebaseESP8266.h"
+#include "TRIGGER_WIFI.h"               
+#include "TRIGGER_GOOGLESHEETS.h" 
+
+#define DHTPIN D4          // Digital pin 4
+#define DHTTYPE DHT11     // DHT 11
+
+#define FIREBASE_HOST "tugas-besar-3dbdc-default-rtdb.firebaseio.com/"
+#define FIREBASE_AUTH "2c2gjFWXMVvc9vOV5H1h2B0C8jPdGjtjfnPk4MZW"
+
+char auth[] = "dlQDb27vLmUJqO5WtaP0L30MG64x3uUA"; 
+
+char ssid[] = "Nu Urang";  
+char pass[] = "moaldiberenyahoah";  
+
+char column_name_in_sheets[ ][20] = {"value1","value2"};                        
+String Sheets_GAS_ID = "AKfycbwW_tsrCyygmoXwkXjU-DvAKuqASA3jA_qyZa9shK2rFB5kryT74PW4v1DkKXsCBY7m";                                         
+int No_of_Parameters = 2;
+
+DHT dht(DHTPIN, DHTTYPE);
+BlynkTimer timer;
+
+FirebaseData firebaseData;
+
+void setup()
+{
+  Serial.begin(9600); // See the connection status in Serial Monitor
+  Blynk.begin(auth, ssid, pass);
+
+  dht.begin();
+  Google_Sheets_Init(column_name_in_sheets, Sheets_GAS_ID, No_of_Parameters );
+
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  // Setup a function to be called every second
+  //timer.setInterval(1000L, sendSensor);
+}
+
+void loop()
+{
+  Blynk.run(); // Initiates Blynk
+  
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+
+  Blynk.virtualWrite(V5, h);  //V5 is for Humidity
+  Blynk.virtualWrite(V6, t);  //V6 is for Temperature
+
+  Data_to_Sheets(No_of_Parameters,  t,  h);
+
+  if(Firebase.setFloat(firebaseData,"/Hasil_Suhu/Suhu", t)){
+    Serial.println("Suhu terkirim");
+  }else{
+    Serial.println("Suhu tidak terkirim");
+    Serial.println("Karena, "+firebaseData.errorReason());
+  }
+
+   if(Firebase.setFloat(firebaseData,"/Hasil_Kelembapan/kelembapan", h)){
+    Serial.println("Kelembaban terkirim");
+  }else{
+    Serial.println("Kelembaban tidak terkirim");
+    Serial.println("Karena, "+firebaseData.errorReason());
+  }
+  
+  delay(10000);
+  timer.run();
+}
